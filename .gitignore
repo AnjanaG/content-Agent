@@ -1,0 +1,10 @@
+.env
+.venv/
+__pycache__/
+*.pyc
+content_agent.db
+content_agent.log
+content_agent.launchd.out.log
+content_agent.launchd.err.log
+agent_ui.log
+agent.pid

@@ -1,0 +1,25 @@
+{
+  "sources": [],
+  "x_accounts": [],
+  "linkedin_searches": [],
+  "daily_searches": [
+    "Andrej Karpathy",
+    "Product Influencers",
+    "growth influencers",
+    "Linkedin",
+    "Dwarkesh Patel",
+    "Peter Yang",
+    "Andrew Ng",
+    "Geoffrey Hinton",
+    "Yann LeCun",
+    "site:reddit.com AI agents product management",
+    "site:reddit.com machine learning discussion"
+  ],
+  "topics": [
+    "agentic AI, Product Management, LLMs, AGI"
+  ],
+  "schedule": {
+    "hour": 6,
+    "count": 12
+  }
+}
