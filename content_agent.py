@@ -143,8 +143,10 @@ def load_config():
             {"name": "Pragmatic Engineer","url": "https://blog.pragmaticengineer.com/rss/",        "type": "rss", "active": True},
             # Tier 4: Web search for X/LinkedIn/WSJ (needs Serper key)
             {"name": "Harvey AI",        "url": None, "type": "web_search", "query": "Harvey AI agents news 2026",         "active": True},
-            {"name": "Sierra AI",        "url": None, "type": "web_search", "query": "Sierra AI Bret Taylor agents 2026",  "active": True},
-            {"name": "Decagon",          "url": None, "type": "web_search", "query": "Decagon AI customer support 2026",   "active": True},
+            {"name": "Sierra AI",        "url": None, "type": "web_search", "query": "Sierra AI announcement OR launch Bret Taylor Clay Bavor conversational agents",  "active": True},
+            {"name": "Decagon",          "url": None, "type": "web_search", "query": "Decagon AI announcement OR funding OR launch Jesse Zhang Ashwin Sreenivas customer agents",   "active": True},
+            {"name": "Sunday Robotics",  "url": None, "type": "web_search", "query": "Sunday Robotics announcement OR funding Tony Zhao Cheng Chi home robot AI", "active": True},
+            {"name": "Sunday voice AI",  "url": None, "type": "web_search", "query": "Sunday AI voice agents business CallSunday announcement", "active": True},
             {"name": "WSJ Tech",         "url": None, "type": "web_search", "query": "site:wsj.com AI agents product 2026","active": True},
         ],
         "x_accounts": [
@@ -154,6 +156,10 @@ def load_config():
             {"name": "Amjad Masad",      "handle": "amasad",          "topic": "Replit vibe coding agents"},
             {"name": "Shreyas Doshi",    "handle": "shreyasdoshi",    "topic": "product manager PM role"},
             {"name": "Bret Taylor",      "handle": "btaylor",         "topic": "Sierra AI agents"},
+            {"name": "Clay Bavor",       "handle": "claybavor",       "topic": "Sierra AI agents product"},
+            {"name": "Jesse Zhang",      "handle": "thejessezhang",   "topic": "Decagon AI customer agents"},
+            {"name": "Tony Zhao",        "handle": "tonyzzhao",       "topic": "Sunday Robotics AI"},
+            {"name": "Cheng Chi",        "handle": "chichengcc",    "topic": "Sunday Robotics AI"},
             {"name": "Michael Truell",   "handle": "mntruell",        "topic": "Cursor coding AI"},
             {"name": "Paul Graham",      "handle": "paulg",           "topic": "startups AI founders"},
             {"name": "Garry Tan",        "handle": "garrytan",        "topic": "YC AI startups coding"},

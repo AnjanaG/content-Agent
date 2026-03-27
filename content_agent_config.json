@@ -1,6 +1,61 @@
 {
-  "sources": [],
-  "x_accounts": [],
+  "sources": [
+    {
+      "name": "Decagon AI news",
+      "url": null,
+      "type": "web_search",
+      "query": "Decagon AI announcement OR funding OR launch Jesse Zhang Ashwin Sreenivas customer agents",
+      "active": true
+    },
+    {
+      "name": "Sierra AI news",
+      "url": null,
+      "type": "web_search",
+      "query": "Sierra AI announcement OR product launch Bret Taylor Clay Bavor conversational agents",
+      "active": true
+    },
+    {
+      "name": "Sunday Robotics news",
+      "url": null,
+      "type": "web_search",
+      "query": "Sunday Robotics announcement OR funding Tony Zhao Cheng Chi robot AI",
+      "active": true
+    },
+    {
+      "name": "Sunday voice AI",
+      "url": null,
+      "type": "web_search",
+      "query": "Sunday AI voice agents business CallSunday announcement founder",
+      "active": true
+    }
+  ],
+  "x_accounts": [
+    {
+      "name": "Jesse Zhang",
+      "handle": "thejessezhang",
+      "topic": "Decagon AI customer agents"
+    },
+    {
+      "name": "Clay Bavor",
+      "handle": "claybavor",
+      "topic": "Sierra AI agents product"
+    },
+    {
+      "name": "Bret Taylor",
+      "handle": "btaylor",
+      "topic": "Sierra AI agents"
+    },
+    {
+      "name": "Tony Zhao",
+      "handle": "tonyzzhao",
+      "topic": "Sunday Robotics AI"
+    },
+    {
+      "name": "Cheng Chi",
+      "handle": "chichengcc",
+      "topic": "Sunday Robotics AI"
+    }
+  ],
   "linkedin_searches": [],
   "daily_searches": [
     "Andrej Karpathy",
@@ -13,7 +68,10 @@
     "Geoffrey Hinton",
     "Yann LeCun",
     "site:reddit.com AI agents product management",
-    "site:reddit.com machine learning discussion"
+    "site:reddit.com machine learning discussion",
+    "Decagon AI founder post announcement",
+    "Sierra AI founder post announcement",
+    "Sunday Robotics founder post Tony Zhao"
   ],
   "topics": [
     "agentic AI, Product Management, LLMs, AGI"
