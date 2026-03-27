@@ -4,6 +4,16 @@ Built from the actual workflow on March 26, 2026.
 
 **Note:** This repository is CLI-only for technical users. The web frontend has been removed.
 
+**Source:** [github.com/AnjanaG/content-Agent](https://github.com/AnjanaG/content-Agent)
+
+To push updates from your machine after cloning or editing locally:
+
+```bash
+git add -A && git commit -m "Your message" && git push origin main
+```
+
+Use GitHub CLI (`gh auth login`), SSH remote, or a [personal access token](https://github.com/settings/tokens) when `git push` asks for credentials.
+
 ---
 
 ## What it does
