@@ -4,6 +4,8 @@ Built from the actual workflow on March 26, 2026.
 
 **Note:** This repository is CLI-only for technical users. The web frontend has been removed.
 
+**Build your own agent:** The repo includes [`content_agent_builder_prompt.md`](content_agent_builder_prompt.md)—a copy-paste prompt you can fill with your own likes, interests, sources, and schedule—then use with an AI to design or adapt a **custom** content agent (same patterns as this project).
+
 **Source:** [github.com/AnjanaG/content-Agent](https://github.com/AnjanaG/content-Agent)
 
 To push updates from your machine after cloning or editing locally:
