@@ -1,4 +1,8 @@
-# Content agent builder prompt
+# Content Filtering Agent — builder prompt
+
+Use this template to specify your own **content filtering agent** (sources, topics, schedule, delivery).
+
+**Typical motivation:** read only from sources you trust, avoid doom scrolling, get a daily digest of what matters, then optionally brainstorm **pros and cons** (or drafts) with an assistant so you stay knowledgeable on topics you care about.
 
 Copy everything inside the fence below into a new chat with an AI assistant (or use it yourself as a spec worksheet). Fill in the bracketed sections, then ask the assistant to **design and implement** a content agent that matches your answers.
 
@@ -8,7 +12,7 @@ Copy everything inside the fence below into a new chat with an AI assistant (or 
 You are helping me design and build a personal “content agent” that runs on a schedule, collects links and summaries from the sources I care about, and delivers a daily brief (usually by email). I want to make my own choices for sources, topics, schedule, and tone.
 
 ## 1. Purpose
-- **Primary goal:** [e.g. stay current for LinkedIn posts / job search / investing / learning / team briefings]
+- **Primary goal:** [e.g. curated reading from trusted influencers, avoid doom scrolling, stay current on specific topics, brainstorm pros and cons by email, optional short posts / job search / team briefings]
 - **Audience:** [just me / my team — describe voice if writing drafts]
 - **Output I want each run:** [numbered list of links + 1–2 line summaries / full digest / only top 3 items / include “surprise” picks]
 

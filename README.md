@@ -1,4 +1,8 @@
-# Anjana's Content Agent
+# Content Filtering Agent
+
+**Purpose:** Curate reading from **sources and influencers you trust** so you see only what you care about—instead of doom scrolling through endless feeds. Stay current on the topics that interest you, then use the reply-by-email flow to **brainstorm pros and cons**, stress-test ideas, and go deeper so you become more knowledgeable (you can also turn a refined take into a short professional post when you want).
+
+A personal **content filtering agent**: it collects and ranks those sources, filters by topic, and emails a daily brief—then optionally brainstorms with you by email.
 
 Built from the actual workflow on March 26, 2026.
 
@@ -6,7 +10,7 @@ Built from the actual workflow on March 26, 2026.
 
 **Build your own agent:** The repo includes [`content_agent_builder_prompt.md`](content_agent_builder_prompt.md)—a copy-paste prompt you can fill with your own likes, interests, sources, and schedule—then use with an AI to design or adapt a **custom** content agent (same patterns as this project).
 
-**Source:** [github.com/AnjanaG/content-Agent](https://github.com/AnjanaG/content-Agent)
+**Source:** [GitHub repository](https://github.com/AnjanaG/content-Agent)
 
 To push updates from your machine after cloning or editing locally:
 
@@ -20,19 +24,19 @@ Use GitHub CLI (`gh auth login`), SSH remote, or a [personal access token](https
 
 ## What it does
 
-Every morning at 6am you get an email with 10 items:
-- Latest from Anthropic, OpenAI, Cursor, Replit, Perplexity blogs
-- TechCrunch AI, Wired, Ars Technica, MIT Tech Review
-- Lenny Rachitsky, The Neuron, Ben's Bites, Dept of Product
-- X posts from Karpathy, Sam Altman, Shreyas Doshi, Aravind Srinivas, Amjad Masad, Bret Taylor
-- LinkedIn posts from top PM voices
-- Podcasts: Lex Fridman, Lenny's Podcast, key AI founder interviews
-- Harvey, Sierra, Decagon, WSJ via web search
+Every morning at 6am you get an email with 10 items curated for staying sharp on **frontier AI** and **high-impact product leadership**—with an eye toward roles at **frontier AI companies** and **organizations using AI to drive innovation and massive real-world impact** (specific employers are not listed here; tune sources in config).
 
-You reply with a number + your raw opinion.
-The agent challenges your angle, verifies all claims, sharpens the post.
-When you say "finalize" — a LinkedIn-ready post lands in your inbox.
-Sources included as a ready-to-paste first comment.
+The brief blends:
+- Company and product blogs (RSS) from leading AI labs and builders
+- Tech and business press (AI, product, industry)
+- Newsletters and long-form analysis
+- Public X and LinkedIn discovery (via search, not logged-in scraping)
+- Podcasts and founder/operator interviews
+- Targeted web search (startups, enterprise AI, major outlets—editable in `content_agent_config.json`)
+
+You reply with a number + your raw angle (or ask to weigh **pros and cons** on the topic).
+The agent challenges vague claims, verifies sources, and helps you think clearly—whether you are learning for yourself or drafting something to publish.
+When you say **finalize** and want a post — a short professional draft lands in your inbox, with sources as a ready-to-paste first comment when applicable.
 
 ---
 

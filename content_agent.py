@@ -1,17 +1,17 @@
 """
-Anjana's LinkedIn Content Agent
+Content Filtering Agent — daily brief + email brainstorm pipeline
 ================================
 Workflow learned from session on Mar 26, 2026:
 
 1. Fetch latest articles/posts/podcasts from frontier AI companies,
    PM influencers, X accounts, tech publications
-2. Filter for Anjana's topics (agents, PM role, AI, Cursor, Claude, Replit etc)
+2. Filter for configured topics (agents, PM role, AI, Cursor, Claude, Replit, etc.)
 3. Send beautiful HTML email digest with 10 items + source links
-4. Anjana replies with her raw opinion
-5. Agent brainstorms with Claude API, challenges her angle, sharpens it
+4. You reply by email with a raw angle or ask to weigh pros and cons on a topic
+5. Agent brainstorms with Claude API—explore tradeoffs, challenge vague claims, sharpen thinking
 6. Validates all claims — finds exact quotes, timestamps, source URLs
-7. Finalizes a LinkedIn-ready post in her voice
-8. Sends final post back to Gmail
+7. Optionally finalizes a short professional post in the configured voice when you ask
+8. Sends the reply (and finalized post, if any) back to Gmail
 
 Key guardrails from session:
 - Every claim must have a verified source URL
@@ -19,7 +19,7 @@ Key guardrails from session:
 - Challenge vague statements ("OpenClaw would have done that in 10 actions" → verify first)
 - Post must be concise — cut ruthlessly
 - Always find primary sources (transcripts, official blogs) not just press coverage
-- Anjana's production experience (TikTok: 200K advertisers, $150M revenue) = the credibility anchor
+- Production experience (TikTok: 200K advertisers, $150M revenue) = the credibility anchor
 - Voice: Direct, opinionated, credible. No buzzword soup. Under 250 words.
 """
 
@@ -28,7 +28,7 @@ import json
 import time
 import sqlite3
 import logging
-import random
+import hashlib
 import schedule
 import requests
 import feedparser
@@ -41,6 +41,7 @@ from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from email.header import decode_header
 from datetime import datetime, timedelta
+from urllib.parse import urlparse
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -61,19 +62,51 @@ TO_EMAIL        = os.getenv("TO_EMAIL", GMAIL_ADDRESS)
 ANTHROPIC_KEY   = os.getenv("ANTHROPIC_API_KEY")
 SERPER_KEY      = os.getenv("SERPER_API_KEY")
 DAILY_HOUR      = int(os.getenv("DAILY_HOUR", "8"))
-ARTICLES_PER_BRIEF = int(os.getenv("ARTICLES_PER_BRIEF", "10"))
+
+# Public name for logs and email chrome (subjects/tags unchanged so Gmail filters keep working).
+AGENT_NAME      = "Content Filtering Agent"
 
 BRIEF_SUBJECT   = "📰 Your Daily Content Brief"
 REPLY_TAG       = "[CONTENT-AGENT]"
-SURPRISE_RATIO  = 0.10
+# Max Reddit threads in one brief (rest come from RSS, LinkedIn, X, web, podcasts).
+REDDIT_MAX_PER_BRIEF = 2
+# LinkedIn discovery: more results + weekly window (indexing lags same-day search).
+LINKEDIN_SERPER_NUM = 8
+LINKEDIN_TBS = "qdr:w"
 
-# ─── ANJANA'S PROFILE ─────────────────────────────────────────────────────────
-# This is the system prompt used for ALL brainstorming.
-# Every lesson from the session is encoded here.
-ANJANA_SYSTEM = """
-You are a sharp editorial partner helping Anjana Gummadivalli craft LinkedIn posts.
 
-ABOUT ANJANA:
+def stable_article_id(prefix: str, url: str) -> str:
+    """Stable across runs (unlike built-in hash() for str)."""
+    digest = hashlib.sha256((url or "").encode("utf-8", errors="ignore")).hexdigest()[:16]
+    return f"{prefix}-{digest}"
+
+
+def brief_item_limit(config: dict) -> int:
+    """
+    Items per brief: ARTICLES_PER_BRIEF in .env overrides schedule.count in JSON, else JSON, else 10.
+    """
+    raw = os.getenv("ARTICLES_PER_BRIEF")
+    if raw is not None and str(raw).strip() != "":
+        try:
+            return max(1, min(50, int(str(raw).strip())))
+        except ValueError:
+            pass
+    c = (config.get("schedule") or {}).get("count")
+    if c is not None:
+        try:
+            return max(1, min(50, int(c)))
+        except (TypeError, ValueError):
+            pass
+    return 10
+
+# ─── EDITOR PROFILE (brainstorm system prompt) ───────────────────────────────
+# Used for every reply-by-email brainstorm. Tune voice and credentials here.
+EDITOR_SYSTEM = """
+You are a sharp editorial partner: help the user deepen their understanding of a topic
+(often by weighing pros and cons, tradeoffs, and evidence) and, when they want to publish,
+craft professional short-form posts (e.g. LinkedIn).
+
+ABOUT THE AUTHOR:
 - Principal PM, shipped agentic AI in production at TikTok
 - Built LLM Ad Assistant: $150M annual incremental revenue
 - Built post-purchase AI support agents: CSAT 30% → 85%
@@ -83,27 +116,29 @@ ABOUT ANJANA:
 - Currently: targeting Principal PM / Group PM at Anthropic, OpenAI, 
   Perplexity, Cursor, Harvey, Lovable, Replit
 
-HER VOICE:
+VOICE:
 - Direct. Opinionated. Credible from REAL production experience.
 - Not theoretical. Not generic. Not buzzword soup.
 - Short punchy paragraphs. Under 250 words per post.
 - Ends with a clear opinion or insight — never a question to the audience.
-- References her TikTok production experience when relevant.
+- References TikTok production experience when relevant.
 
 YOUR JOB AS BRAINSTORM PARTNER:
-1. Validate her angle — is it specific enough? Does it ring true from production?
-2. Challenge vague claims — if she says something like "X would do Y faster", 
-   push her to verify it or remove it.
-3. Ask ONE sharp question to get a more specific, credible detail.
-4. When ready to finalize, write the post in her voice.
-5. Always verify: are quotes verbatim? Do we have source URLs and timestamps?
-6. Cut ruthlessly. Under 250 words. Every sentence must earn its place.
+1. If they are exploring (not publishing yet), map balanced pros and cons and what the
+   sources actually support—then help them form a clear, defensible view.
+2. Validate the angle — is it specific enough? Does it ring true from production?
+3. Challenge vague claims — if they say something like "X would do Y faster", 
+   push to verify it or remove it.
+4. Ask ONE sharp question to get a more specific, credible detail.
+5. When they ask to finalize a post, write it in the author's voice.
+6. Always verify: are quotes verbatim? Do we have source URLs and timestamps?
+7. Cut ruthlessly. Under 250 words for finalized posts. Every sentence must earn its place.
 
-WHAT MAKES HER POSTS STAND OUT:
-- She's shipped what others are theorizing about
-- She has a "two out of three" type insight — a named rule from real experience
-- She's not afraid to disagree with consensus
-- Her credibility numbers are specific: $150M, 200K advertisers, 30→85% CSAT
+WHAT MAKES THESE POSTS STAND OUT:
+- They've shipped what others are theorizing about
+- A "two out of three" type insight — a named rule from real experience
+- Not afraid to disagree with consensus
+- Credibility numbers are specific: $150M, 200K advertisers, 30→85% CSAT
 
 When the post is ready to finalize, output ONLY the final post text 
 wrapped in [POST START] and [POST END] tags, followed by sources in
@@ -147,6 +182,13 @@ def load_config():
             {"name": "Decagon",          "url": None, "type": "web_search", "query": "Decagon AI announcement OR funding OR launch Jesse Zhang Ashwin Sreenivas customer agents",   "active": True},
             {"name": "Sunday Robotics",  "url": None, "type": "web_search", "query": "Sunday Robotics announcement OR funding Tony Zhao Cheng Chi home robot AI", "active": True},
             {"name": "Sunday voice AI",  "url": None, "type": "web_search", "query": "Sunday AI voice agents business CallSunday announcement", "active": True},
+            {
+                "name": "Agentic workflows innovation",
+                "url": None,
+                "type": "web_search",
+                "query": "agentic workflow innovation OR agentic AI orchestration multi-step LLM agents 2026",
+                "active": True,
+            },
             {"name": "WSJ Tech",         "url": None, "type": "web_search", "query": "site:wsj.com AI agents product 2026","active": True},
         ],
         "x_accounts": [
@@ -170,6 +212,16 @@ def load_config():
             "Lenny Rachitsky LinkedIn PM job market AI",
             "Tomer Cohen LinkedIn full stack builder product",
             "Claire Vo LinkedIn AI product manager",
+            "AI product management thought leadership agentic LLM",
+            "enterprise AI adoption product strategy lessons learned",
+            "chief product officer generative AI transformation",
+            "principal product manager machine learning platform",
+            "AI agent go-to-market B2B SaaS product",
+            "LLM production deployment product manager",
+            "frontier AI product launch company post",
+            "AI trust safety responsible AI product leadership",
+            "agentic workflow innovation product leadership",
+            "multi-agent orchestration enterprise AI strategy",
         ],
         "daily_searches": [
             "agentic AI product manager 2026",
@@ -180,10 +232,12 @@ def load_config():
             "Jensen Huang Karpathy Sam Altman AI opinion this week",
             "OpenClaw Claude computer use agents news",
             "site:reddit.com AI agents product management",
-            "site:reddit.com machine learning industry discussion",
+            "agentic workflow innovation announcement 2026",
+            "AI agent orchestration tools multi-step workflow",
         ],
         "topics": [
             "agentic AI", "AI agents", "LLM", "agentic workflows",
+            "agentic workflow", "orchestration", "multi-agent",
             "product manager", "PM role", "product management",
             "Cursor", "Claude Code", "Replit", "vibe coding",
             "frontier AI", "AI product", "computer use",
@@ -275,6 +329,20 @@ def normalize_topics(topics):
     return normalized
 
 
+def load_x_following_from_env():
+    """
+    Optional: comma-separated X handles from env (without @).
+    Example: X_FOLLOWING_HANDLES=karpathy,sama,ylecun
+    """
+    raw = os.getenv("X_FOLLOWING_HANDLES", "")
+    handles = []
+    for part in raw.split(","):
+        h = part.strip().lstrip("@")
+        if h:
+            handles.append(h)
+    return handles
+
+
 def build_discovery_queries(config, topics):
     """
     Build extra discovery searches from configured companies/people/topics so
@@ -290,13 +358,22 @@ def build_discovery_queries(config, topics):
     for topic in topic_seeds:
         queries.append(f"{topic} product launch this week")
         queries.append(f"{topic} startup funding announcement")
-        queries.append(f"site:reddit.com {topic} discussion")
 
     for company in companies[:5]:
         queries.append(f"companies similar to {company} latest news")
 
     for person in people[:5]:
         queries.append(f"{person} recent interview podcast")
+
+    # Agentic workflows — innovations in orchestration, multi-step agents, tooling.
+    queries.extend(
+        [
+            "agentic workflow innovation multi-step AI agents enterprise 2026",
+            "agentic AI orchestration tooling product launch announcement",
+            "LLM agent workflow automation case study production",
+            "multi-agent systems coordination product innovation",
+        ]
+    )
 
     # Deduplicate while preserving order.
     seen = set()
@@ -305,7 +382,7 @@ def build_discovery_queries(config, topics):
         if q not in seen:
             seen.add(q)
             deduped.append(q)
-    return deduped[:18]
+    return deduped[:24]
 
 
 def build_surprise_queries(topics):
@@ -318,7 +395,7 @@ def build_surprise_queries(topics):
         "future of product management this week",
         "enterprise AI adoption case study this week",
         "technology leadership podcast episode this week",
-        "site:reddit.com startup product discussion this week",
+        "agentic workflow breakthrough research or product this week",
     ]
     for topic in topics[:3]:
         base.append(f"unexpected trend in {topic} this week")
@@ -334,7 +411,7 @@ def fetch_rss(source, conn, topics, include_seen=False):
             title   = entry.get("title", "")
             url     = entry.get("link", "")
             summary = entry.get("summary", "")[:500]
-            article_id = f"rss-{hash(url)}"
+            article_id = stable_article_id("rss", url)
             if not include_seen and already_seen(conn, article_id):
                 continue
             if not is_relevant(title + " " + summary, topics):
@@ -342,7 +419,8 @@ def fetch_rss(source, conn, topics, include_seen=False):
             articles.append({
                 "id": article_id, "title": title, "url": url,
                 "summary": summary, "source": source["name"],
-                "type": "article"
+                "type": "article",
+                "published_ts": time.mktime(entry.published_parsed) if entry.get("published_parsed") else None,
             })
             if not include_seen:
                 mark_seen(conn, article_id, title, source["name"], url)
@@ -350,30 +428,64 @@ def fetch_rss(source, conn, topics, include_seen=False):
         log.warning(f"RSS failed [{source['name']}]: {e}")
     return articles
 
-def fetch_web(query, label, conn, topics, include_seen=False, enforce_relevance=True):
+def _is_reddit_url(url: str) -> bool:
+    if not url:
+        return False
+    u = url.lower()
+    return "reddit.com" in u or "redd.it" in u
+
+
+def cap_reddit_articles(articles: list, max_reddit: int) -> list:
+    """Keep at most max_reddit items whose URL is Reddit; drop extra Reddit, keep order."""
+    out = []
+    n = 0
+    for a in articles:
+        if _is_reddit_url(a.get("url", "")):
+            if n < max_reddit:
+                out.append(a)
+                n += 1
+        else:
+            out.append(a)
+    return out
+
+
+def fetch_web(
+    query,
+    label,
+    conn,
+    topics,
+    include_seen=False,
+    enforce_relevance=True,
+    num=6,
+    tbs="qdr:d",
+):
     articles = []
     if not SERPER_KEY:
         return articles
+    qlow = (query or "").lower()
+    if "site:reddit.com" in qlow or "site:www.reddit.com" in qlow:
+        num = min(num, REDDIT_MAX_PER_BRIEF)
     try:
         r = requests.post(
             "https://google.serper.dev/search",
             headers={"X-API-KEY": SERPER_KEY, "Content-Type": "application/json"},
-            json={"q": query, "num": 5, "tbs": "qdr:d"},
-            timeout=10
+            json={"q": query, "num": num, "tbs": tbs},
+            timeout=12
         )
         r.raise_for_status()
-        for result in r.json().get("organic", []):
+        for idx, result in enumerate(r.json().get("organic", []), start=1):
             title   = result.get("title", "")
             url     = result.get("link", "")
             snippet = result.get("snippet", "")
-            article_id = f"web-{hash(url)}"
+            article_id = stable_article_id("web", url)
             if not include_seen and already_seen(conn, article_id):
                 continue
             if enforce_relevance and not is_relevant(title + " " + snippet, topics):
                 continue
             articles.append({
                 "id": article_id, "title": title, "url": url,
-                "summary": snippet, "source": label, "type": "article"
+                "summary": snippet, "source": label, "type": "article",
+                "search_position": idx,
             })
             if not include_seen:
                 mark_seen(conn, article_id, title, label, url)
@@ -391,7 +503,7 @@ def fetch_podcast(query, label, conn, topics, include_seen=False):
         include_seen=include_seen
     )
 
-def fetch_all(config, conn, include_seen=False):
+def fetch_all(config, conn, include_seen=False, limit=None):
     topics = normalize_topics(config.get("topics", []))
     all_articles = []
 
@@ -405,14 +517,35 @@ def fetch_all(config, conn, include_seen=False):
             all_articles.extend(fetch_web(source["query"], source["name"], conn, topics, include_seen=include_seen))
         time.sleep(0.3)
 
-    # X accounts via Serper
-    for acct in config.get("x_accounts", []):
+    # X accounts via Serper (configured + optional env-provided following handles).
+    x_accounts = list(config.get("x_accounts", []))
+    existing_handles = {a.get("handle", "").lower() for a in x_accounts}
+    for h in load_x_following_from_env():
+        if h.lower() not in existing_handles:
+            x_accounts.append({"name": h, "handle": h, "topic": "AI product agents"})
+            existing_handles.add(h.lower())
+
+    for acct in x_accounts:
         q = f"from:{acct['handle']} {acct['topic']} site:twitter.com OR site:x.com"
         all_articles.extend(fetch_web(q, f"X / @{acct['handle']}", conn, topics, include_seen=include_seen))
 
-    # LinkedIn searches
+    # LinkedIn searches (deeper pass: more organic results + weekly window)
     for query in config.get("linkedin_searches", []):
-        all_articles.extend(fetch_web(query + " site:linkedin.com", "LinkedIn", conn, topics, include_seen=include_seen))
+        q = (query or "").strip()
+        if not q:
+            continue
+        linkedin_q = q if "site:linkedin.com" in q.lower() else q + " site:linkedin.com"
+        all_articles.extend(
+            fetch_web(
+                linkedin_q,
+                "LinkedIn",
+                conn,
+                topics,
+                include_seen=include_seen,
+                num=LINKEDIN_SERPER_NUM,
+                tbs=LINKEDIN_TBS,
+            )
+        )
 
     # Daily web searches
     for query in config.get("daily_searches", []):
@@ -459,26 +592,114 @@ def fetch_all(config, conn, include_seen=False):
             seen_urls.add(a["url"])
             unique.append(a)
 
-    limit = config.get("schedule", {}).get("count", 10)
+    # Hard cap Reddit so brief stays professional (LinkedIn / RSS / press weighted higher).
+    unique = cap_reddit_articles(unique, REDDIT_MAX_PER_BRIEF)
+
     if not unique:
         return []
 
-    surprise_pool = [a for a in unique if a.get("source") == "Surprise"]
-    core_pool = [a for a in unique if a.get("source") != "Surprise"]
+    ranked = rank_articles(unique, topics)
+    lim = limit if limit is not None else brief_item_limit(config)
+    return ranked[:lim]
 
-    surprise_target = max(1, int(round(limit * SURPRISE_RATIO)))
-    surprise_target = min(surprise_target, len(surprise_pool), limit)
-    core_target = max(0, limit - surprise_target)
 
-    # Keep ordering stable overall, but randomize surprise items so this stays fresh.
-    random.shuffle(surprise_pool)
-    selected = core_pool[:core_target] + surprise_pool[:surprise_target]
+def _domain(url: str) -> str:
+    try:
+        return (urlparse(url).netloc or "").lower()
+    except Exception:
+        return ""
 
-    # Backfill if one pool is short.
-    if len(selected) < limit:
-        remaining = [a for a in unique if a not in selected]
-        selected.extend(remaining[: limit - len(selected)])
-    return selected
+
+def _source_trust_weight(source: str, url: str) -> float:
+    s = (source or "").lower()
+    d = _domain(url)
+    # High trust: frontier labs, top publications, and known expert channels.
+    if any(x in d for x in ["anthropic.com", "openai.com", "deepmind.google", "technologyreview.com", "wsj.com", "techcrunch.com"]):
+        return 1.0
+    if "linkedin" in s:
+        return 0.80
+    if s.startswith("x / @"):
+        return 0.82
+    if s.startswith("podcast"):
+        return 0.72
+    if s in {"discovery", "surprise", "web search"}:
+        return 0.68
+    return 0.75
+
+
+def _recency_score(article: dict) -> float:
+    ts = article.get("published_ts")
+    if ts:
+        age_hours = max(0.0, (time.time() - float(ts)) / 3600.0)
+        if age_hours <= 24:
+            return 1.0
+        if age_hours <= 72:
+            return 0.8
+        if age_hours <= 168:
+            return 0.55
+        return 0.35
+    src = (article.get("source") or "").lower()
+    if "linkedin" in src or src.startswith("x / @"):
+        return 0.8
+    if src.startswith("podcast"):
+        return 0.55
+    return 0.65
+
+
+def _topic_coverage_score(article: dict, topics: list) -> float:
+    text = f"{article.get('title', '')} {article.get('summary', '')}".lower()
+    matches = 0
+    for t in topics:
+        if t.lower() in text:
+            matches += 1
+    return min(1.0, matches / 3.0)
+
+
+def _engagement_hint_score(article: dict) -> float:
+    text = f"{article.get('title', '')} {article.get('summary', '')}".lower()
+    signals = [
+        "launch", "announc", "funding", "benchmark", "case study",
+        "viral", "repost", "comment", "interview", "podcast",
+    ]
+    hits = sum(1 for s in signals if s in text)
+    pos = article.get("search_position") or 10
+    position_bonus = max(0.0, (10 - min(int(pos), 10)) / 10.0)
+    return min(1.0, (hits / 4.0) * 0.7 + position_bonus * 0.3)
+
+
+def rank_articles(articles: list, topics: list) -> list:
+    scored = []
+    for a in articles:
+        trust = _source_trust_weight(a.get("source", ""), a.get("url", ""))
+        recency = _recency_score(a)
+        topic = _topic_coverage_score(a, topics)
+        engage = _engagement_hint_score(a)
+        base = (0.38 * trust) + (0.27 * recency) + (0.20 * topic) + (0.15 * engage)
+        b = dict(a)
+        b["_base_score"] = round(base, 4)
+        scored.append(b)
+
+    scored.sort(key=lambda x: x["_base_score"], reverse=True)
+
+    # Diversity/uniqueness: discourage too many from same domain/source in top slots.
+    domain_count = {}
+    source_count = {}
+    reranked = []
+    for a in scored:
+        d = _domain(a.get("url", ""))
+        s = a.get("source", "")
+        d_penalty = 0.07 * max(0, domain_count.get(d, 0))
+        s_penalty = 0.06 * max(0, source_count.get(s, 0))
+        a["_score"] = round(a["_base_score"] - d_penalty - s_penalty, 4)
+        reranked.append(a)
+        domain_count[d] = domain_count.get(d, 0) + 1
+        source_count[s] = source_count.get(s, 0) + 1
+
+    reranked.sort(key=lambda x: x["_score"], reverse=True)
+    for a in reranked:
+        a.pop("_base_score", None)
+        a.pop("_score", None)
+    return reranked
 
 # ─── CLAUDE BRAINSTORM ────────────────────────────────────────────────────────
 def brainstorm(article, user_message, conversation_history):
@@ -486,7 +707,7 @@ def brainstorm(article, user_message, conversation_history):
     Core brainstorm loop with guardrails:
     - Challenges vague claims
     - Verifies quotes and sources
-    - Shapes Anjana's voice
+    - Shapes the configured author voice
     - Finalizes when ready
     """
     client = anthropic.Anthropic(api_key=ANTHROPIC_KEY)
@@ -500,7 +721,7 @@ Type: {article.get('type', 'article')}
 Summary: {article.get('summary', '')[:500]}
 """
 
-    system = ANJANA_SYSTEM + "\n\n" + article_context
+    system = EDITOR_SYSTEM + "\n\n" + article_context
 
     messages = conversation_history + [
         {"role": "user", "content": user_message}
@@ -598,7 +819,7 @@ def build_brief_html(articles, date_str):
     <div style="background:#111;border-radius:14px;padding:26px 30px;margin-bottom:24px;">
       <div style="font-size:11px;color:#777;font-family:monospace;
         text-transform:uppercase;letter-spacing:0.12em;margin-bottom:6px;">
-        Daily Content Brief · {REPLY_TAG}
+        {AGENT_NAME} · Daily Content Brief · {REPLY_TAG}
       </div>
       <div style="font-size:24px;font-weight:700;color:#fff;margin-bottom:4px;">
         {date_str}
@@ -755,10 +976,8 @@ def poll_replies(conn, articles_in_session):
         mail.select("inbox")
 
         since = (datetime.utcnow() - timedelta(days=3)).strftime("%d-%b-%Y")
+        # IMAP SEARCH must be ASCII; use tag only (all agent emails include REPLY_TAG).
         _, msg_ids = mail.search(None, f'(UNSEEN SINCE {since} SUBJECT "{REPLY_TAG}")')
-
-        if not msg_ids[0]:
-            _, msg_ids = mail.search(None, f'(UNSEEN SINCE {since} SUBJECT "Re: {BRIEF_SUBJECT}")')
 
         for msg_id in msg_ids[0].split():
             _, msg_data = mail.fetch(msg_id, "(RFC822)")
@@ -884,8 +1103,20 @@ def run_daily_brief():
     global todays_articles
     log.info("Running daily brief...")
     config = load_config()
+    limit = brief_item_limit(config)
     conn = init_db()
-    articles = fetch_all(config, conn, include_seen=False)
+    articles = fetch_all(config, conn, include_seen=False, limit=limit)
+    if len(articles) < limit:
+        # Backfill from previously seen items when today's pool is sparse.
+        fallback = fetch_all(config, conn, include_seen=True, limit=limit)
+        seen_urls = {a.get("url") for a in articles}
+        for a in fallback:
+            if a.get("url") not in seen_urls:
+                articles.append(a)
+                seen_urls.add(a.get("url"))
+            if len(articles) >= limit:
+                break
+    articles = articles[:limit]
     conn.close()
 
     if not articles:
@@ -906,14 +1137,11 @@ def send_requested_brief(mode="more"):
     """
     global todays_articles
     config = load_config()
-    base_count = config.get("schedule", {}).get("count", ARTICLES_PER_BRIEF)
-    if mode == "more":
-        config.setdefault("schedule", {})["count"] = min(base_count + 5, 20)
-    else:
-        config.setdefault("schedule", {})["count"] = base_count
+    base = brief_item_limit(config)
+    effective = min(base + 5, 20) if mode == "more" else base
 
     conn = init_db()
-    articles = fetch_all(config, conn, include_seen=True)
+    articles = fetch_all(config, conn, include_seen=True, limit=effective)
     conn.close()
 
     if not articles:
@@ -932,7 +1160,7 @@ def send_requested_brief(mode="more"):
 
 # ─── MAIN ────────────────────────────────────────────────────────────────────
 if __name__ == "__main__":
-    log.info("🤖 Anjana's Content Agent starting...")
+    log.info(f"🤖 {AGENT_NAME} starting...")
 
     # Send brief immediately on start
     run_daily_brief()

@@ -27,6 +27,13 @@
       "type": "web_search",
       "query": "Sunday AI voice agents business CallSunday announcement founder",
       "active": true
+    },
+    {
+      "name": "Agentic workflows innovation",
+      "url": null,
+      "type": "web_search",
+      "query": "agentic workflow innovation OR agentic AI orchestration multi-step LLM agents 2026",
+      "active": true
     }
   ],
   "x_accounts": [
@@ -56,25 +63,36 @@
       "topic": "Sunday Robotics AI"
     }
   ],
-  "linkedin_searches": [],
+  "linkedin_searches": [
+    "AI product management thought leadership agentic LLM",
+    "enterprise AI adoption product strategy lessons learned",
+    "chief product officer generative AI transformation",
+    "principal product manager machine learning platform",
+    "AI agent go-to-market B2B SaaS product",
+    "LLM production deployment product manager",
+    "frontier AI product launch company post",
+    "AI trust safety responsible AI product leadership",
+    "agentic workflow innovation product leadership LinkedIn",
+    "multi-agent orchestration enterprise AI strategy",
+    "LLM agent workflow automation product insights"
+  ],
   "daily_searches": [
     "Andrej Karpathy",
     "Product Influencers",
     "growth influencers",
-    "Linkedin",
     "Dwarkesh Patel",
     "Peter Yang",
     "Andrew Ng",
     "Geoffrey Hinton",
     "Yann LeCun",
     "site:reddit.com AI agents product management",
-    "site:reddit.com machine learning discussion",
     "Decagon AI founder post announcement",
     "Sierra AI founder post announcement",
-    "Sunday Robotics founder post Tony Zhao"
+    "Sunday Robotics founder post Tony Zhao",
+    "agentic workflow innovation product announcement"
   ],
   "topics": [
-    "agentic AI, Product Management, LLMs, AGI"
+    "agentic AI, Product Management, LLMs, AGI, agentic workflows, AI orchestration, multi-agent systems, workflow automation"
   ],
   "schedule": {
     "hour": 6,
