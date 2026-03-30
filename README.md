@@ -188,15 +188,44 @@ Perfect. Here's the post...
 
 ## Run permanently on Mac
 
-```bash
-nohup python content_agent.py > /dev/null 2>&1 &
-echo $! > agent.pid
+**Cursor does not need to be open.** The agent is just a Python process; only that process must be running.
 
-# Stop it:
-kill $(cat agent.pid)
+### Option A — Launch Agent (recommended)
+
+Starts the agent **at login**, keeps it **alive** (restarts if it crashes), and writes stdout/stderr to `content_agent.launchd.out.log` / `content_agent.launchd.err.log`.
+
+1. Stop any manual copy first: `kill "$(cat agent.pid)" 2>/dev/null || true`
+2. From the project folder:
+
+```bash
+./scripts/install_launch_agent.sh
 ```
 
-As long as this process is running, the agent will run automatically every day at 6:00 AM.
+3. Start it now without logging out:
+
+```bash
+launchctl kickstart -k "gui/$(id -u)/com.user.contentagent"
+```
+
+Uninstall: `launchctl bootout "gui/$(id -u)/com.user.contentagent"`
+
+### Option B — Manual background process
+
+```bash
+nohup .venv/bin/python content_agent.py >> content_agent.log 2>&1 &
+echo $! > agent.pid
+```
+
+Stop: `kill "$(cat agent.pid)"`
+
+### Sleep and exact clock times
+
+When the **Mac is asleep**, macOS **suspends** normal apps, so the in-process daily timer **does not run at the scheduled hour**. After wake, the loop resumes, but you can **miss** the intended send time. To get a reliable morning brief:
+
+- **Schedule a wake** before your brief: **System Settings → Battery → Schedule** (or **Energy Saver** on some Macs) and set a daily wake a few minutes before `DAILY_HOUR` in `.env`, **or**
+- **Deploy on Railway** (below) so the job runs on an always-on host.
+
+As long as the Mac is **awake** and the process is **running**, the agent uses `DAILY_HOUR` from `.env` (local time) for the daily brief.
 
 ## Deploy free on Railway
 
