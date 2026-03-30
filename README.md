@@ -1,4 +1,4 @@
-# Anjana's LinkedIn Content Agent
+# Anjana's Content Agent
 
 Built from the actual workflow on March 26, 2026.
 
