@@ -1,54 +1,46 @@
-# Content Filtering Agent
+# content-Agent
 
-**Purpose:** Curate reading from **sources and influencers you trust** so you see only what you care about—instead of doom scrolling through endless feeds. Stay current on the topics that interest you, then use the reply-by-email flow to **brainstorm pros and cons**, stress-test ideas, and go deeper so you become more knowledgeable (you can also turn a refined take into a short professional post when you want).
+Agentic content curation system — multi-source ingestion, AI ranking, email delivery, brainstorm loop, LinkedIn post generation.
 
-A personal **content filtering agent**: it collects and ranks those sources, filters by topic, and emails a daily brief—then optionally brainstorms with you by email.
+Runs at 6am daily. Pulls from RSS feeds, X, LinkedIn, and web search. Filters by topic. Sends a 10-item brief by email. You reply with a number and a take — the agent brainstorms with you, pushes back on vague claims, and when you're ready, drafts a post and sends it to your inbox.
 
-Built from the actual workflow on March 26, 2026.
-
-**Note:** This repository is CLI-only for technical users. The web frontend has been removed.
-
-**Build your own agent:** The repo includes [`content_agent_builder_prompt.md`](content_agent_builder_prompt.md)—a copy-paste prompt you can fill with your own likes, interests, sources, and schedule—then use with an AI to design or adapt a **custom** content agent (same patterns as this project).
-
-**Source:** [GitHub repository](https://github.com/AnjanaG/content-Agent)
-
-To push updates from your machine after cloning or editing locally:
-
-```bash
-git add -A && git commit -m "Your message" && git push origin main
-```
-
-Use GitHub CLI (`gh auth login`), SSH remote, or a [personal access token](https://github.com/settings/tokens) when `git push` asks for credentials.
+Built from the actual workflow I use to stay sharp on frontier AI and product leadership.
 
 ---
 
 ## What it does
 
-Every morning at 6am you get an email with 10 items curated for staying sharp on **frontier AI** and **high-impact product leadership**—with an eye toward roles at **frontier AI companies** and **organizations using AI to drive innovation and massive real-world impact** (specific employers are not listed here; tune sources in config).
-
 The brief blends:
-- Company and product blogs (RSS) from leading AI labs and builders
+
+- Company and product blogs via RSS (AI labs, builders)
 - Tech and business press (AI, product, industry)
 - Newsletters and long-form analysis
-- Public X and LinkedIn discovery (via search, not logged-in scraping)
-- Podcasts and founder/operator interviews
-- Targeted web search (startups, enterprise AI, major outlets—editable in `content_agent_config.json`)
+- Public X and LinkedIn discovery via search (not logged-in scraping)
+- Targeted web search (configurable in `content_agent_config.json`)
 
-You reply with a number + your raw angle (or ask to weigh **pros and cons** on the topic).
-The agent challenges vague claims, verifies sources, and helps you think clearly—whether you are learning for yourself or drafting something to publish.
-When you say **finalize** and want a post — a short professional draft lands in your inbox, with sources as a ready-to-paste first comment when applicable.
+You reply to the email with a number and your raw take. The agent challenges vague claims, asks for specifics, and helps you think clearly. When you say "finalize," a polished post lands in your inbox with sources ready to paste.
 
 ---
 
-## Guardrails (learned from session)
+## Architecture decisions
 
-1. **Every claim verified** — agent pushes back on anything vague or unverified
-2. **Every quote verbatim** — with source URL and timestamp
-3. **Source URL required** — for every company, product, or statistic mentioned
-4. **Voice enforced** — direct, specific, production-credible. No buzzword soup.
-5. **250 word limit** — agent cuts ruthlessly
-6. **Primary sources preferred** — transcripts, official blogs, not just press coverage
-7. **Credibility anchor** — TikTok: $150M, 200K advertisers, 30→85% CSAT
+**Why an agent loop instead of a simple script?**
+
+A curation script would just fetch, rank, and send. The value here is in the conversation — the agent needs to hold context across multiple email exchanges, track which article you're discussing, remember constraints you've set ("don't suggest anything from this outlet"), and maintain a coherent brainstorm thread.
+
+The loop architecture means the agent can re-enter a conversation mid-draft, pick up where you left off, and apply everything said in the thread to the next turn. A simple script can't do that.
+
+**Context management strategy**
+
+Each email reply is parsed to extract the referenced item number, the user's position, and any new constraints. The agent reconstructs context from the thread rather than maintaining server-side session state. This makes the system stateless and resilient — if the process restarts, the next email reply picks up cleanly.
+
+Email threads act as the persistent context store. This is intentional: it means the history is human-readable, portable, and not locked in a database.
+
+**Source quality**
+
+Sources are weighted by two signals: recency (newer = more relevant) and reputation (configurable tiers in `content_agent_config.json`). A first-person account from a founder on their company blog ranks higher than a third-party summary of the same event. Primary sources are preferred — transcripts, official posts, primary research — over press coverage.
+
+The agent enforces this in the brainstorm phase: every claim in the draft needs a primary source URL or it gets flagged.
 
 ---
 
@@ -56,7 +48,7 @@ When you say **finalize** and want a post — a short professional draft lands i
 
 ```mermaid
 flowchart TD
-    A[Agent runs at 6:00 AM] --> B[Collect sources<br/>RSS + X + LinkedIn + Web]
+    A[Agent runs at 6:00 AM] --> B[Collect sources: RSS + X + LinkedIn + Web]
     B --> C[Filter by user topics]
     C --> D[Send brief email]
     D --> E{User reply}
@@ -69,176 +61,70 @@ flowchart TD
 
 ---
 
-## Quick Start by Persona
+## Guardrails
 
-## For Technical Users (CLI)
+Every claim verified. Every quote verbatim with source URL. Primary sources preferred. Voice enforced: direct, specific, production-credible. 250 word limit enforced.
+
+---
+
+## Setup
+
+### Prerequisites
+
+- Anthropic API key: [console.anthropic.com](https://console.anthropic.com)
+- Serper API key (free tier): [serper.dev](https://serper.dev) — needed for X, LinkedIn, and web search
+- Gmail account with 2-Step Verification enabled
 
 ### Step 1 — Gmail App Password
+
 1. myaccount.google.com → Security → 2-Step Verification → App passwords
-2. Generate for Mail → copy 16-char code
+2. Generate for Mail, copy the 16-character code
 
 ### Step 2 — Enable IMAP
+
 Gmail → Settings → Forwarding and POP/IMAP → Enable IMAP
 
-### Step 3 — Get API keys
-- Anthropic: console.anthropic.com → API Keys
-- Serper (free): serper.dev (needed for X, LinkedIn, WSJ)
+### Step 3 — Configure
 
-### Step 4 — Configure
 ```bash
 cp .env.example .env
-# Fill in your keys
+# Fill in ANTHROPIC_API_KEY, SERPER_API_KEY, Gmail address and app password
 ```
 
-Set this in `.env`:
+Set send time in `.env`:
+
 ```bash
 DAILY_HOUR=6
 ```
 
-Important: never share your real `.env` file. Share only `.env.example`.
+### Step 4 — Run
 
-### Step 5 — Run
 ```bash
 .venv/bin/python -m pip install -r requirements.txt
 .venv/bin/python content_agent.py
 ```
 
 ### Optional — Run continuously on Mac
+
 ```bash
 nohup .venv/bin/python content_agent.py > /dev/null 2>&1 &
 ```
 
----
-
-## CLI-only setup
-
-This project is configured for technical users and CLI usage only.
-Configure `.env`, edit `content_agent_config.json` directly, and run:
-
-```bash
-.venv/bin/python content_agent.py
-```
-
----
-
-## The email workflow
-
-**6am — Brief arrives:**
-```
-📰 Your Daily Content Brief — Thursday, March 26
-
-10 items matched your topics
-
-1. 🎙️ Lex Fridman Podcast
-   Jensen Huang: NVIDIA - The $4 Trillion Company & the AI Revolution
-   "I think it's now. I think we've achieved AGI..."
-   → Read / Listen
-
-2. 📄 Anthropic
-   Put Claude to work on your computer
-   Claude can now open apps, click, navigate...
-   → Read / Listen
-
-[...8 more...]
-
-↩ Reply with: [number] [your raw take]
-```
-
-**You reply:**
-```
-1 Jensen's "two out of three" rule — I was building this manually at 
-TikTok without a name for it. Agents with all three (read data, 
-execute code, communicate externally) is how things go wrong at scale.
-```
-
-**Agent replies — Brainstorm Round 1:**
-```
-That's strong. "Jensen named the rule, you were building it" is the 
-credibility line. But let me push: what specifically went wrong at 
-TikTok when agents had all three? Was it a campaign that ran wrong? 
-An order that got cancelled? That specific moment will land harder 
-than the general principle.
-```
-
-**You:**
-```
-Our LLM ad agent once flagged 400 campaigns for budget reallocation 
-simultaneously — the downstream communication went out before human 
-review. Had to roll back.
-```
-
-**Agent:**
-```
-Perfect. Here's the post...
-[POST START]
-...
-[POST END]
-[SOURCES START]
-→ Jensen Huang, Lex Fridman Podcast #494 (Mar 23): lexfridman.com/jensen-huang
-→ "two out of three" — transcript timestamp 00:37:03
-→ Anthropic Computer Use (Mar 24): support.claude.com/en/articles/computer-use
-[SOURCES END]
-```
-
-**You:** `finalize`
-
-**Final post lands in inbox — copy paste to LinkedIn.**
-
----
-
-## Run permanently on Mac
-
-**Cursor does not need to be open.** The agent is just a Python process; only that process must be running.
-
-### Option A — Launch Agent (recommended)
-
-Starts the agent **at login**, keeps it **alive** (restarts if it crashes), and writes stdout/stderr to `content_agent.launchd.out.log` / `content_agent.launchd.err.log`.
-
-1. Stop any manual copy first: `kill "$(cat agent.pid)" 2>/dev/null || true`
-2. From the project folder:
+Or use the included Launch Agent script for a cleaner setup that survives reboots:
 
 ```bash
 ./scripts/install_launch_agent.sh
-```
-
-3. Start it now without logging out:
-
-```bash
 launchctl kickstart -k "gui/$(id -u)/com.user.contentagent"
 ```
 
-Uninstall: `launchctl bootout "gui/$(id -u)/com.user.contentagent"`
+### Deploy on Railway (always-on)
 
-### Option B — Manual background process
-
-```bash
-nohup .venv/bin/python content_agent.py >> content_agent.log 2>&1 &
-echo $! > agent.pid
-```
-
-Stop: `kill "$(cat agent.pid)"`
-
-### Sleep and exact clock times
-
-When the **Mac is asleep**, macOS **suspends** normal apps, so the in-process daily timer **does not run at the scheduled hour**. After wake, the loop resumes, but you can **miss** the intended send time. To get a reliable morning brief:
-
-- **Schedule a wake** before your brief: **System Settings → Battery → Schedule** (or **Energy Saver** on some Macs) and set a daily wake a few minutes before `DAILY_HOUR` in `.env`, **or**
-- **Deploy on Railway** (below) so the job runs on an always-on host.
-
-As long as the Mac is **awake** and the process is **running**, the agent uses `DAILY_HOUR` from `.env` (local time) for the daily brief.
-
-## Deploy free on Railway
-
-1. Push this folder to GitHub
+1. Push to GitHub
 2. railway.app → New Project → Deploy from GitHub
 3. Add .env variables in Railway dashboard
-4. Done — runs 24/7
 
 ---
 
 ## Customize sources
 
-Edit sources in `content_agent_config.json`
-or modify the defaults in `content_agent.py` under `load_config()`.
-
-Add any RSS feed, X account, or web search query.
+Edit `content_agent_config.json` to add RSS feeds, X accounts, or web search queries. The config drives everything — no code changes needed for new sources.
